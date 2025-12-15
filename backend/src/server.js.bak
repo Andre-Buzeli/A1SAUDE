@@ -1,0 +1,236 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import compression from 'compression';
+import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
+import dotenv from 'dotenv';
+import { PrismaClient } from '@prisma/client';
+import Redis from 'ioredis';
+
+// Load environment variables
+dotenv.config();
+
+// Initialize Prisma Client
+export const prisma = new PrismaClient();
+
+// Initialize Redis Client
+export const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379');
+
+const app = express();
+const PORT = process.env.PORT || 5001;
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: ["'self'"]
+    }
+  }
+}));
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || 'http://localhost:5002',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '900000'), // 15 minutes
+  max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS || '100'),
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+app.use(limiter);
+
+// Body parsing middleware
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
+
+// Compression middleware
+app.use(compression());
+
+// Logging middleware
+app.use(morgan('combined'));
+
+// Audit middleware
+app.use(async (req, res, next) => {
+  const startTime = Date.now();
+
+  // Store original send method
+  const originalSend = res.send;
+
+  res.send = function(data) {
+    // Log audit events for sensitive operations
+    const auditActions = [
+      'POST /api/patients',
+      'PUT /api/patients',
+      'DELETE /api/patients',
+      'POST /api/prescriptions',
+      'PUT /api/prescriptions',
+      'POST /api/attendances/start',
+      'PUT /api/attendances',
+      'POST /api/admin/users',
+      'PUT /api/admin/users',
+      'PUT /api/admin/users/:id/status',
+      'POST /api/hospital/admissions',
+      'PUT /api/hospital/admissions/:id/discharge'
+    ];
+
+    const requestPath = `${req.method} ${req.path}`;
+    const shouldAudit = auditActions.some(action => {
+      const actionParts = action.split(' ');
+      if (actionParts.length < 2) return false;
+      const actionPath = actionParts[1];
+      const actionMethod = actionParts[0];
+      return requestPath.includes(actionPath) && req.method === actionMethod;
+    });
+
+    if (shouldAudit && req.user && req.user.id) {
+      prisma.auditLog.create({
+        data: {
+          userId: req.user.id,
+          action: `${req.method} ${req.path}`,
+          resource: req.path.split('/')[2] || 'unknown',
+          details: {
+            method: req.method,
+            path: req.path,
+            query: req.query,
+            body: req.method !== 'GET' ? req.body : undefined,
+            statusCode: res.statusCode,
+            duration: Date.now() - startTime,
+            userAgent: req.get('User-Agent'),
+            ip: req.ip
+          },
+          ipAddress: req.ip,
+          userAgent: req.get('User-Agent')
+        }
+      }).catch(error => console.error('Audit logging failed:', error));
+    }
+
+    // Call original send method
+    return originalSend.call(this, data);
+  };
+
+  next();
+});
+
+// Health check endpoint
+app.get('/health', async (req, res) => {
+  try {
+    // Check database connection
+    await prisma.$queryRaw`SELECT 1`;
+    
+    // Check Redis connection
+    await redis.ping();
+    
+    res.status(200).json({
+      status: 'healthy',
+      timestamp: new Date().toISOString(),
+      services: {
+        database: 'connected',
+        redis: 'connected'
+      }
+    });
+  } catch (error) {
+    res.status(503).json({
+      status: 'unhealthy',
+      timestamp: new Date().toISOString(),
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
+});
+
+// Import routes
+import authRoutes from './routes/auth.js';
+import patientRoutes from './routes/patients.js';
+import attendanceRoutes from './routes/attendances.js';
+import prescriptionRoutes from './routes/prescriptions.js';
+import examRoutes from './routes/exams.js';
+import triageRoutes from './routes/triage.js';
+import medicationRoutes from './routes/medications.js';
+import vitalSignsRoutes from './routes/vital-signs.js';
+import nursingRoutes from './routes/nursing.js';
+import adminRoutes from './routes/admin.js';
+
+// API routes
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/patients', patientRoutes);
+app.use('/api/v1/attendances', attendanceRoutes);
+app.use('/api/v1/prescriptions', prescriptionRoutes);
+app.use('/api/v1/exams', examRoutes);
+app.use('/api/v1/triage', triageRoutes);
+app.use('/api/v1/medications', medicationRoutes);
+app.use('/api/v1/vital-signs', vitalSignsRoutes);
+app.use('/api/v1/nursing', nursingRoutes);
+app.use('/api/v1/admin', adminRoutes);
+
+// Default API route
+app.use('/api/v1', (req, res) => {
+  res.json({ 
+    message: 'A1 Saúde API v1.0.0 - Sistema de Gestão de Saúde Pública',
+    version: '1.0.0',
+    endpoints: {
+      auth: '/api/v1/auth',
+      health: '/health'
+    }
+  });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  
+  res.status(err.status || 500).json({
+    error: {
+      message: err.message || 'Internal Server Error',
+      status: err.status || 500,
+      timestamp: new Date().toISOString()
+    }
+  });
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+  res.status(404).json({
+    error: {
+      message: 'Route not found',
+      status: 404,
+      timestamp: new Date().toISOString()
+    }
+  });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM received, shutting down gracefully');
+  await prisma.$disconnect();
+  await redis.quit();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  await prisma.$disconnect();
+  await redis.quit();
+  process.exit(0);
+});
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`🚀 A1 Saúde Server running on port ${PORT}`);
+  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+  console.log(`🔗 API: http://localhost:${PORT}/api/v1`);
+});
+
+export default app;

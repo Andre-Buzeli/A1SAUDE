@@ -1,0 +1,232 @@
+import { Request, Response } from 'express';
+import { PhysiotherapistDashboardService } from '../services/PhysiotherapistDashboardService';
+import { AuthRequest } from '../middlewares/auth';
+
+export class PhysiotherapistController {
+  private physiotherapistDashboardService: PhysiotherapistDashboardService;
+
+  constructor() {
+    this.physiotherapistDashboardService = new PhysiotherapistDashboardService();
+  }
+
+  async getDashboard(req: AuthRequest, res: Response) {
+    try {
+      const { establishmentType } = req.params;
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+      }
+
+      // Verificar se o usuário tem permissão de fisioterapeuta
+      if (req.user?.profile !== 'fisioterapeuta') {
+        return res.status(403).json({ error: 'Acesso negado. Perfil de fisioterapeuta requerido.' });
+      }
+
+      if (!['hospital', 'upa', 'ubs'].includes(establishmentType)) {
+        return res.status(400).json({ error: 'Tipo de estabelecimento inválido' });
+      }
+
+      const dashboardData = await this.physiotherapistDashboardService.getDashboardData(
+        userId,
+        establishmentType as 'hospital' | 'upa' | 'ubs'
+      );
+
+      res.json(dashboardData);
+    } catch (error) {
+      console.error('Erro ao buscar dashboard fisioterapia:', error);
+      res.status(500).json({ error: 'Erro interno ao buscar dashboard' });
+    }
+  }
+
+  async getPatients(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { page = 1, limit = 10, status = 'all', search = '' } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+      }
+
+      if (req.user?.profile !== 'fisioterapeuta') {
+        return res.status(403).json({ error: 'Acesso negado. Perfil de fisioterapeuta requerido.' });
+      }
+
+      const patients = await this.physiotherapistDashboardService.getPatients(
+        userId,
+        {
+          page: Number(page),
+          limit: Number(limit),
+          status: status as string,
+          search: search as string
+        }
+      );
+
+      res.json(patients);
+    } catch (error) {
+      console.error('Erro ao buscar pacientes:', error);
+      res.status(500).json({ error: 'Erro interno ao buscar pacientes' });
+    }
+  }
+
+  async getSessions(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { 
+        page = 1, 
+        limit = 10, 
+        status = 'all', 
+        patientId = '',
+        dateFrom = '',
+        dateTo = ''
+      } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+      }
+
+      if (req.user?.profile !== 'fisioterapeuta') {
+        return res.status(403).json({ error: 'Acesso negado. Perfil de fisioterapeuta requerido.' });
+      }
+
+      const sessions = await this.physiotherapistDashboardService.getSessions(
+        userId,
+        {
+          page: Number(page),
+          limit: Number(limit),
+          status: status as string,
+          patientId: patientId as string,
+          dateFrom: dateFrom as string,
+          dateTo: dateTo as string
+        }
+      );
+
+      res.json(sessions);
+    } catch (error) {
+      console.error('Erro ao buscar sessões:', error);
+      res.status(500).json({ error: 'Erro interno ao buscar sessões' });
+    }
+  }
+
+  async getEvaluations(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { 
+        page = 1, 
+        limit = 10, 
+        status = 'all', 
+        patientId = '',
+        type = 'all'
+      } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+      }
+
+      if (req.user?.profile !== 'fisioterapeuta') {
+        return res.status(403).json({ error: 'Acesso negado. Perfil de fisioterapeuta requerido.' });
+      }
+
+      const evaluations = await this.physiotherapistDashboardService.getEvaluations(
+        userId,
+        {
+          page: Number(page),
+          limit: Number(limit),
+          status: status as string,
+          patientId: patientId as string,
+          type: type as string
+        }
+      );
+
+      res.json(evaluations);
+    } catch (error) {
+      console.error('Erro ao buscar avaliações:', error);
+      res.status(500).json({ error: 'Erro interno ao buscar avaliações' });
+    }
+  }
+
+  async createEvaluation(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { patientId, type, notes, scores, recommendations } = req.body;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+      }
+
+      if (req.user?.profile !== 'fisioterapeuta') {
+        return res.status(403).json({ error: 'Acesso negado. Perfil de fisioterapeuta requerido.' });
+      }
+
+      if (!patientId || !type || !notes) {
+        return res.status(400).json({ error: 'Dados obrigatórios faltando' });
+      }
+
+      const evaluation = await this.physiotherapistDashboardService.createEvaluation(
+        userId,
+        {
+          patientId,
+          type,
+          notes,
+          scores,
+          recommendations
+        }
+      );
+
+      res.status(201).json(evaluation);
+    } catch (error) {
+      console.error('Erro ao criar avaliação:', error);
+      res.status(500).json({ error: 'Erro interno ao criar avaliação' });
+    }
+  }
+
+  async getRehabilitationAlerts(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+      }
+
+      if (req.user?.profile !== 'fisioterapeuta') {
+        return res.status(403).json({ error: 'Acesso negado. Perfil de fisioterapeuta requerido.' });
+      }
+
+      const alerts = await this.physiotherapistDashboardService.getRehabilitationAlerts(userId);
+
+      res.json(alerts);
+    } catch (error) {
+      console.error('Erro ao buscar alertas de reabilitação:', error);
+      res.status(500).json({ error: 'Erro interno ao buscar alertas' });
+    }
+  }
+
+  async getPhysiotherapyReports(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.id;
+      const { type = 'monthly', dateFrom, dateTo } = req.query;
+
+      if (!userId) {
+        return res.status(401).json({ error: 'Usuário não autenticado' });
+      }
+
+      if (req.user?.profile !== 'fisioterapeuta') {
+        return res.status(403).json({ error: 'Acesso negado. Perfil de fisioterapeuta requerido.' });
+      }
+
+      const reports = await this.physiotherapistDashboardService.getPhysiotherapyReports(
+        userId,
+        {
+          type: type as string,
+          dateFrom: dateFrom as string,
+          dateTo: dateTo as string
+        }
+      );
+
+      res.json(reports);
+    } catch (error) {
+      console.error('Erro ao buscar relatórios fisioterapia:', error);
+      res.status(500).json({ error: 'Erro interno ao buscar relatórios' });
+    }
+  }
+}

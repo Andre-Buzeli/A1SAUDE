@@ -1,0 +1,1 @@
+Por exemplo, um diretor da unidade do hospital, ele vai ter o acesso geral com todos os dados financeiros, contratos, fornecedores, somente do seu hospital, mas também aquele hospital pode ter um acesso de gestor local que vai ser pra alguém, tá preenchendo os cadastros, enfim, essa questão.

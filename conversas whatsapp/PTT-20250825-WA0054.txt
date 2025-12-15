@@ -1,0 +1,1 @@
+É exatamente isso, só que tem que ter um acesso que ele tem para um gestor geral da unidade, mas que ele só tem acesso a unidade dele, que eu através do licenciamento filtro, qual é a unidade dele, e aí vai ter o acesso completo.

@@ -1,0 +1,628 @@
+// Sistema A1 Saúde - Prisma Schema
+// Banco de dados PostgreSQL com todas as tabelas necessárias
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Enums para o Sistema A1 Saúde
+enum UserProfile {
+  gestor_geral
+  diretor_local
+  gestor_local
+  coordenador_geral
+  coordenador_local
+  supervisor
+  secretario
+  recepcionista
+  medico
+  enfermeiro
+  tecnico_enfermagem
+  farmaceutico
+  psicologo
+  fisioterapeuta
+  system_master
+}
+
+enum EstablishmentType {
+  upa
+  ubs
+  hospital
+}
+
+enum Gender {
+  male
+  female
+  other
+}
+
+enum MaritalStatus {
+  single
+  married
+  divorced
+  widowed
+  other
+}
+
+enum BloodType {
+  A_POSITIVE
+  A_NEGATIVE
+  B_POSITIVE
+  B_NEGATIVE
+  AB_POSITIVE
+  AB_NEGATIVE
+  O_POSITIVE
+  O_NEGATIVE
+}
+
+enum AttendanceType {
+  consultation
+  emergency
+  procedure
+  surgery
+  exam
+  vaccination
+}
+
+enum AttendanceStatus {
+  scheduled
+  in_progress
+  completed
+  cancelled
+  no_show
+}
+
+enum PriorityLevel {
+  red
+  orange
+  yellow
+  green
+  blue
+}
+
+enum PrescriptionStatus {
+  active
+  completed
+  cancelled
+  expired
+}
+
+enum ExamStatus {
+  requested
+  scheduled
+  in_progress
+  completed
+  cancelled
+}
+
+// Tabela de estabelecimentos de saúde
+model Establishment {
+  id              String            @id @default(cuid())
+  name            String
+  cnesCode        String            @unique
+  type            EstablishmentType
+  
+  // Endereço
+  street          String
+  number          String
+  complement      String?
+  neighborhood    String
+  city            String
+  state           String
+  zipCode         String
+  
+  // Contato
+  phone           String
+  email           String
+  website         String?
+  emergencyPhone  String?
+  
+  // Configurações
+  operatingHours  Json
+  services        Json[]
+  capacity        Json
+  
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  users           User[]
+  units           Unit[]
+  attendances     Attendance[]
+  beds            Bed[]
+  budgets         Budget[]
+  expenses        Expense[]
+  contracts       Contract[]
+  diseaseNotifications DiseaseNotification[]
+  
+  @@map("establishments")
+}
+
+// Tabela principal de usuários
+model User {
+  id                String      @id @default(cuid())
+  name              String
+  email             String      @unique
+  cpf               String      @unique
+  phone             String?
+  passwordHash      String
+  profile           UserProfile
+  establishmentType EstablishmentType
+  establishmentId   String
+  establishmentName String
+  isActive          Boolean     @default(true)
+  lastLogin         DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relacionamentos
+  establishment     Establishment     @relation(fields: [establishmentId], references: [id])
+  attendances       Attendance[]
+  prescriptions     Prescription[]
+  auditLogs         AuditLog[]
+  sessions          Session[]
+  expensesCreated   Expense[]
+  contractsCreated  Contract[]
+  notificationsCreated DiseaseNotification[] @relation("NotificationCreator")
+  notificationsInvestigated DiseaseNotification[] @relation("NotificationInvestigator")
+  
+  @@map("users")
+}
+
+// Tabela de pacientes
+model Patient {
+  id               String            @id @default(cuid())
+  name             String
+  cpf              String            @unique
+  rg               String?
+  birthDate        DateTime
+  gender           Gender
+  maritalStatus    MaritalStatus
+  motherName       String?
+  fatherName       String?
+  
+  // Endereço
+  street           String
+  number           String
+  complement       String?
+  neighborhood     String
+  city             String
+  state            String
+  zipCode          String
+  
+  // Contato
+  phone            String?
+  email            String?
+  emergencyContact Json?
+  
+  // Informações médicas
+  allergies        Json[]
+  chronicConditions Json[]
+  medications      Json[]
+  bloodType        BloodType?
+  height           Float?
+  weight           Float?
+  
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  
+  // Relacionamentos
+  attendances      Attendance[]
+  prescriptions    Prescription[]
+  examRequests     ExamRequest[]
+  admissions       Admission[]
+  triages          Triage[]
+  vitalSigns       VitalSigns[]
+  diseaseNotifications DiseaseNotification[]
+  medicationAdministrations MedicationAdministration[]
+  medicationSchedules MedicationSchedule[]
+  
+  @@map("patients")
+}
+
+// Tabela de unidades/setores
+model Unit {
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  establishmentId String
+  capacity        Int?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  attendances     Attendance[]
+  beds            Bed[]
+  
+  @@map("units")
+}
+
+// Tabela de atendimentos
+model Attendance {
+  id              String            @id @default(cuid())
+  patientId       String
+  professionalId  String
+  establishmentId String
+  unitId          String?
+  type            AttendanceType
+  status          AttendanceStatus
+  startTime       DateTime
+  endTime         DateTime?
+  chiefComplaint  String
+  
+  // SOAP
+  subjective      String?
+  objective       String?
+  assessment      String?
+  plan            String?
+  
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  professional    User              @relation(fields: [professionalId], references: [id])
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  unit            Unit?             @relation(fields: [unitId], references: [id])
+  prescriptions   Prescription[]
+  examRequests    ExamRequest[]
+  procedures      Procedure[]
+  triage          Triage?
+  medicationAdministrations MedicationAdministration[]
+  
+  @@map("attendances")
+}
+
+// Tabela de prescrições
+model Prescription {
+  id              String            @id @default(cuid())
+  patientId       String
+  professionalId  String
+  attendanceId    String?
+  status          PrescriptionStatus
+  medications     Json[]
+  instructions    String?
+  validUntil      DateTime
+  digitalSignature String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  professional    User              @relation(fields: [professionalId], references: [id])
+  attendance      Attendance?       @relation(fields: [attendanceId], references: [id])
+  medicationAdministrations MedicationAdministration[]
+  medicationSchedules MedicationSchedule[]
+  
+  @@map("prescriptions")
+}
+
+// Administração de medicamentos
+model MedicationAdministration {
+  id              String   @id @default(cuid())
+  patientId       String
+  prescriptionId  String?
+  attendanceId    String?
+  medicationName  String
+  dosage          String
+  route           String
+  frequency       String
+  scheduledFor    DateTime?
+  administeredAt  DateTime?
+  administeredBy  String?
+  notes           String?
+  status          String   @default("scheduled")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  prescription    Prescription? @relation(fields: [prescriptionId], references: [id])
+  attendance      Attendance?   @relation(fields: [attendanceId], references: [id])
+
+  @@map("medication_administrations")
+}
+
+// Agenda de medicamentos
+model MedicationSchedule {
+  id              String   @id @default(cuid())
+  patientId       String
+  prescriptionId  String
+  medicationName  String
+  dosage          String
+  route           String
+  frequency       String
+  startDate       DateTime
+  endDate         DateTime?
+  scheduledTimes  Json
+  notes           String?
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  prescription    Prescription @relation(fields: [prescriptionId], references: [id])
+
+  @@map("medication_schedules")
+}
+// Tabela de solicitações de exames
+model ExamRequest {
+  id              String            @id @default(cuid())
+  patientId       String
+  attendanceId    String?
+  examType        String
+  description     String
+  status          ExamStatus
+  requestedAt     DateTime          @default(now())
+  scheduledFor    DateTime?
+  completedAt     DateTime?
+  results         Json?
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  attendance      Attendance?       @relation(fields: [attendanceId], references: [id])
+  
+  @@map("exam_requests")
+}
+
+// Tabela de sinais vitais
+model VitalSigns {
+  id              String            @id @default(cuid())
+  patientId       String
+  systolicBP      Int?
+  diastolicBP     Int?
+  heartRate       Int?
+  temperature     Float?
+  respiratoryRate Int?
+  oxygenSaturation Float?
+  weight          Float?
+  height          Float?
+  painScale       Int?
+  recordedAt      DateTime          @default(now())
+  recordedBy      String
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  
+  @@map("vital_signs")
+}
+
+// Tabela de triagem
+model Triage {
+  id              String            @id @default(cuid())
+  patientId       String
+  attendanceId    String            @unique
+  priority        PriorityLevel
+  chiefComplaint  String
+  vitalSigns      Json?
+  symptoms        Json[]
+  riskFactors     Json[]
+  triageTime      DateTime          @default(now())
+  triageBy        String
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  attendance      Attendance        @relation(fields: [attendanceId], references: [id])
+  
+  @@map("triages")
+}
+
+// Tabela de leitos
+model Bed {
+  id              String            @id @default(cuid())
+  number          String
+  unitId          String
+  establishmentId String
+  type            String
+  status          String            @default("available")
+  isActive        Boolean           @default(true)
+  
+  // Relacionamentos
+  unit            Unit              @relation(fields: [unitId], references: [id])
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  admissions      Admission[]
+  
+  @@unique([number, unitId])
+  @@map("beds")
+}
+
+// Tabela de internações
+model Admission {
+  id              String            @id @default(cuid())
+  patientId       String
+  bedId           String
+  admissionDate   DateTime          @default(now())
+  dischargeDate   DateTime?
+  reason          String
+  status          String            @default("active")
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  bed             Bed               @relation(fields: [bedId], references: [id])
+  
+  @@map("admissions")
+}
+
+// Tabela de procedimentos
+model Procedure {
+  id              String            @id @default(cuid())
+  attendanceId    String
+  name            String
+  description     String?
+  performedAt     DateTime          @default(now())
+  performedBy     String
+  
+  // Relacionamentos
+  attendance      Attendance        @relation(fields: [attendanceId], references: [id])
+  
+  @@map("procedures")
+}
+
+// Tabela de sessões ativas
+model Session {
+  id           String    @id @default(cuid())
+  userId       String
+  token        String    @unique
+  refreshToken String    @unique
+  ipAddress    String?
+  userAgent    String?
+  isActive     Boolean   @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Tabela de logs de auditoria
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  details   Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relacionamentos
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+// Tabela de orçamentos
+model Budget {
+  id              String            @id @default(cuid())
+  establishmentId String
+  year            Int
+  month           Int
+  category        String
+  subcategory     String?
+  budgetedAmount  Decimal
+  spentAmount     Decimal           @default(0)
+  description     String?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  expenses        Expense[]
+
+  @@unique([establishmentId, year, month, category, subcategory])
+  @@map("budgets")
+}
+
+// Tabela de despesas
+model Expense {
+  id              String            @id @default(cuid())
+  establishmentId String
+  budgetId        String?
+  category        String
+  subcategory     String?
+  amount          Decimal
+  description     String
+  expenseDate     DateTime
+  invoiceNumber   String?
+  supplier        String?
+  paymentMethod   String?
+  paymentDate     DateTime?
+  status          String            @default("pending")
+  approvedBy      String?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  budget          Budget?           @relation(fields: [budgetId], references: [id])
+  creator         User              @relation(fields: [createdBy], references: [id])
+
+  @@map("expenses")
+}
+
+// Tabela de contratos
+model Contract {
+  id              String            @id @default(cuid())
+  establishmentId String
+  contractNumber  String
+  supplier        String
+  description     String
+  contractType    String
+  startDate       DateTime
+  endDate         DateTime
+  totalValue      Decimal
+  monthlyValue    Decimal?
+  status          String            @default("active")
+  paymentTerms    String?
+  renewalTerms    String?
+  contactPerson   String?
+  contactPhone    String?
+  contactEmail    String?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  creator         User              @relation(fields: [createdBy], references: [id])
+
+  @@unique([establishmentId, contractNumber])
+  @@map("contracts")
+}
+
+// Tabela de notificações epidemiológicas
+model DiseaseNotification {
+  id              String            @id @default(cuid())
+  establishmentId String
+  patientId       String?
+  diseaseCode     String
+  diseaseName     String
+  notificationDate DateTime         @default(now())
+  symptomOnsetDate DateTime?
+  diagnosisDate   DateTime?
+  notificationType String           @default("compulsory")
+  severity        String?
+  outcome         String?
+  investigationStatus String        @default("pending")
+  epidemiologicalWeek Int
+  epidemiologicalYear Int
+  patientAge      Int?
+  patientGender   String?
+  patientCity     String?
+  patientNeighborhood String?
+  riskFactors     Json[]
+  symptoms        Json[]
+  labResults      Json[]
+  treatmentGiven  String?
+  contactTracing  Boolean          @default(false)
+  sinanSent       Boolean          @default(false)
+  sinanDate       DateTime?
+  notes           String?
+  notifiedBy      String
+  investigatedBy  String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  patient         Patient?          @relation(fields: [patientId], references: [id])
+  notifier        User              @relation("NotificationCreator", fields: [notifiedBy], references: [id])
+  investigator    User?             @relation("NotificationInvestigator", fields: [investigatedBy], references: [id])
+
+  @@map("disease_notifications")
+}

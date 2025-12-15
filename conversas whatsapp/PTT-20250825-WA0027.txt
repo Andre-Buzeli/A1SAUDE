@@ -1,0 +1,1 @@
+Essa parte toda que tem gestão da unidade para baixo, usuários, profissionais, gestão financeira, contratos, análise epidemiológica, isso tudo ela não pode ser no geral. Ela tem que ser específica de cada unidade, entendeu?

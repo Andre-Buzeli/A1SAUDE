@@ -1,0 +1,12 @@
+{
+  "watch": ["src"],
+  "ext": "ts,json",
+  "ignore": ["src/**/*.test.js", "src/**/*.spec.js"],
+  "exec": "node node_modules/tsx/dist/cli.mjs src/server.ts",
+  "env": {
+    "NODE_ENV": "development",
+    "TS_NODE_TRANSPILE_ONLY": "1"
+  },
+  "delay": 1000,
+  "verbose": true
+}

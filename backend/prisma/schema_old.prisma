@@ -1,0 +1,1705 @@
+// Sistema A1 Saúde - Prisma Schema para SQLite (Desenvolvimento)
+// Banco de dados SQLite para desenvolvimento
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Enums como strings para SQLite
+model Establishment {
+  id              String            @id @default(cuid())
+  name            String
+  cnesCode        String            @unique
+  type            String // "upa" | "ubs" | "hospital"
+  
+  // Endereço
+  street          String
+  number          String
+  complement      String?
+  neighborhood    String
+  city            String
+  state           String
+  zipCode         String
+  
+  // Contato
+  phone           String
+  email           String
+  website         String?
+  emergencyPhone  String?
+  
+  // Configurações (como JSON stringificado)
+  operatingHours  String // JSON string
+  services        String // JSON string
+  capacity        String // JSON string
+  
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  users           User[]
+  units           Unit[]
+  attendances     Attendance[]
+  beds            Bed[]
+  budgets         Budget[]
+  expenses        Expense[]
+  contracts       Contract[]
+  diseaseNotifications DiseaseNotification[]
+  medicalEvolutions MedicalEvolution[]
+  documents       Document[]
+  employees       Employee[]
+  homeVisits      HomeVisit[]
+  surgeries       Surgery[]
+  imagingExams    ImagingExam[]
+  vaccinations    Vaccination[]
+  healthPrograms  HealthProgram[]
+  dentalAttendances DentalAttendance[]
+  labExams        LabExam[]
+  pharmacyProducts PharmacyProduct[]
+  medicationRoomRecords MedicationRoom[]
+  minorSurgeries  MinorSurgery[]
+  emergencyAttendances EmergencyAttendance[]
+  icuAdmissions   ICUAdmission[]
+  discharges      Discharge[]
+  
+  @@map("establishments")
+}
+
+// Tabela principal de usuários
+model User {
+  id                String      @id @default(cuid())
+  name              String
+  email             String      @unique
+  cpf               String      @unique
+  phone             String?
+  passwordHash      String
+  profile           String // "gestor_geral" | "diretor_local" | "gestor_local" | etc
+  establishmentType String // "upa" | "ubs" | "hospital"
+  establishmentId   String
+  establishmentName String
+  isActive          Boolean     @default(true)
+  lastLogin         DateTime?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  
+  // Relacionamentos
+  establishment     Establishment     @relation(fields: [establishmentId], references: [id])
+  attendances       Attendance[]
+  prescriptions     Prescription[]
+  auditLogs         AuditLog[]
+  sessions          Session[]
+  expensesCreated   Expense[]
+  contractsCreated  Contract[]
+  notificationsCreated DiseaseNotification[] @relation("NotificationCreator")
+  notificationsInvestigated DiseaseNotification[] @relation("NotificationInvestigator")
+  medicalEvolutions MedicalEvolution[]
+  documents         Document[]
+  
+  @@map("users")
+}
+
+// Tabela de pacientes
+model Patient {
+  id               String            @id @default(cuid())
+  name             String
+  cpf              String            @unique
+  rg               String?
+  birthDate        DateTime
+  gender           String // "male" | "female" | "other"
+  maritalStatus    String // "single" | "married" | "divorced" | "widowed" | "other"
+  motherName       String?
+  fatherName       String?
+  
+  // Endereço
+  street           String
+  number           String
+  complement       String?
+  neighborhood     String
+  city             String
+  state            String
+  zipCode          String
+  
+  // Contato
+  phone            String?
+  email            String?
+  emergencyContact String? // JSON string
+  
+  // Informações médicas (como JSON string)
+  allergies        String // JSON string
+  chronicConditions String // JSON string
+  medications      String // JSON string
+  bloodType        String? // "A_POSITIVE" | "A_NEGATIVE" | etc
+  height           Float?
+  weight           Float?
+  
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  
+  // Relacionamentos
+  attendances       Attendance[]
+  prescriptions     Prescription[]
+  examRequests      ExamRequest[]
+  medicalEvolutions MedicalEvolution[]
+  documents         Document[]
+  admissions       Admission[]
+  triages          Triage[]
+  vitalSigns       VitalSigns[]
+  diseaseNotifications DiseaseNotification[]
+  medicationAdministrations MedicationAdministration[]
+  medicationSchedules MedicationSchedule[]
+  homeVisits        HomeVisit[]
+  surgeries         Surgery[]
+  imagingExams      ImagingExam[]
+  vaccinations      Vaccination[]
+  programEnrollments ProgramEnrollment[]
+  dentalAttendances DentalAttendance[]
+  labExams          LabExam[]
+  medicationRoomRecords MedicationRoom[]
+  minorSurgeries    MinorSurgery[]
+  emergencyAttendances EmergencyAttendance[]
+  icuAdmissions     ICUAdmission[]
+  discharges        Discharge[]
+  
+  @@map("patients")
+}
+
+// Tabela de unidades/setores
+model Unit {
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  establishmentId String
+  capacity        Int?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  attendances     Attendance[]
+  beds            Bed[]
+  
+  @@map("units")
+}
+
+// Tabela de atendimentos
+model Attendance {
+  id              String            @id @default(cuid())
+  patientId       String
+  professionalId  String
+  establishmentId String
+  unitId          String?
+  type            String // "consultation" | "emergency" | "procedure" | "surgery" | "exam" | "vaccination"
+  status          String // "scheduled" | "in_progress" | "completed" | "cancelled" | "no_show"
+  startTime       DateTime
+  endTime         DateTime?
+  chiefComplaint  String
+  
+  // SOAP
+  subjective      String?
+  objective       String?
+  assessment      String?
+  plan            String?
+  
+  notes           String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  professional    User              @relation(fields: [professionalId], references: [id])
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  unit            Unit?             @relation(fields: [unitId], references: [id])
+  prescriptions   Prescription[]
+  examRequests    ExamRequest[]
+  procedures      Procedure[]
+  triage          Triage?
+  medicationAdministrations MedicationAdministration[]
+  
+  @@map("attendances")
+}
+
+// Tabela de prescrições
+model Prescription {
+  id              String            @id @default(cuid())
+  patientId       String
+  professionalId  String
+  attendanceId    String?
+  status          String // "active" | "completed" | "cancelled" | "expired"
+  medications     String // JSON string
+  instructions    String?
+  validUntil      DateTime
+  digitalSignature String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  professional    User              @relation(fields: [professionalId], references: [id])
+  attendance      Attendance?       @relation(fields: [attendanceId], references: [id])
+  medicationAdministrations MedicationAdministration[]
+  medicationSchedules MedicationSchedule[]
+  
+  @@map("prescriptions")
+}
+
+// Administração de medicamentos
+model MedicationAdministration {
+  id              String   @id @default(cuid())
+  patientId       String
+  prescriptionId  String?
+  attendanceId    String?
+  medicationName  String
+  dosage          String
+  route           String
+  frequency       String
+  scheduledFor    DateTime?
+  administeredAt  DateTime?
+  administeredBy  String?
+  notes           String?
+  status          String   @default("scheduled")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  prescription    Prescription? @relation(fields: [prescriptionId], references: [id])
+  attendance      Attendance?   @relation(fields: [attendanceId], references: [id])
+
+  @@map("medication_administrations")
+}
+
+// Agenda de medicamentos
+model MedicationSchedule {
+  id              String   @id @default(cuid())
+  patientId       String
+  prescriptionId  String
+  medicationName  String
+  dosage          String
+  route           String
+  frequency       String
+  startDate       DateTime
+  endDate         DateTime?
+  scheduledTimes  String // JSON string
+  notes           String?
+  status          String   @default("active")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  prescription    Prescription @relation(fields: [prescriptionId], references: [id])
+
+  @@map("medication_schedules")
+}
+
+// Tabela de solicitações de exames
+model ExamRequest {
+  id              String            @id @default(cuid())
+  patientId       String
+  attendanceId    String?
+  examType        String
+  description     String
+  status          String // "requested" | "scheduled" | "in_progress" | "completed" | "cancelled"
+  requestedAt     DateTime          @default(now())
+  scheduledFor    DateTime?
+  completedAt     DateTime?
+  results         String? // JSON string
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  attendance      Attendance?       @relation(fields: [attendanceId], references: [id])
+  
+  @@map("exam_requests")
+}
+
+// Tabela de sinais vitais
+model VitalSigns {
+  id              String            @id @default(cuid())
+  patientId       String
+  systolicBP      Int?
+  diastolicBP     Int?
+  heartRate       Int?
+  temperature     Float?
+  respiratoryRate Int?
+  oxygenSaturation Float?
+  weight          Float?
+  height          Float?
+  painScale       Int?
+  recordedAt      DateTime          @default(now())
+  recordedBy      String
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  
+  @@map("vital_signs")
+}
+
+// Tabela de triagem
+model Triage {
+  id              String            @id @default(cuid())
+  patientId       String
+  attendanceId    String            @unique
+  priority        String // "red" | "orange" | "yellow" | "green" | "blue"
+  chiefComplaint  String
+  vitalSigns      String? // JSON string
+  symptoms        String // JSON string
+  riskFactors     String // JSON string
+  triageTime      DateTime          @default(now())
+  triageBy        String
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  attendance      Attendance        @relation(fields: [attendanceId], references: [id])
+  
+  @@map("triages")
+}
+
+// Tabela de leitos
+model Bed {
+  id              String            @id @default(cuid())
+  number          String
+  unitId          String
+  establishmentId String
+  type            String
+  status          String            @default("available")
+  isActive        Boolean           @default(true)
+  
+  // Relacionamentos
+  unit            Unit              @relation(fields: [unitId], references: [id])
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  admissions      Admission[]
+  
+  @@unique([number, unitId])
+  @@map("beds")
+}
+
+// Tabela de internações
+model Admission {
+  id              String            @id @default(cuid())
+  patientId       String
+  bedId           String
+  admissionDate   DateTime          @default(now())
+  dischargeDate   DateTime?
+  reason          String
+  status          String            @default("active")
+  
+  // Relacionamentos
+  patient         Patient           @relation(fields: [patientId], references: [id])
+  bed             Bed               @relation(fields: [bedId], references: [id])
+  
+  @@map("admissions")
+}
+
+// Tabela de procedimentos
+model Procedure {
+  id              String            @id @default(cuid())
+  attendanceId    String
+  name            String
+  description     String?
+  performedAt     DateTime          @default(now())
+  performedBy     String
+  
+  // Relacionamentos
+  attendance      Attendance        @relation(fields: [attendanceId], references: [id])
+  
+  @@map("procedures")
+}
+
+// Tabela de sessões ativas
+model Session {
+  id           String    @id @default(cuid())
+  userId       String
+  token        String    @unique
+  refreshToken String    @unique
+  ipAddress    String?
+  userAgent    String?
+  isActive     Boolean   @default(true)
+  expiresAt    DateTime
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relacionamentos
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("sessions")
+}
+
+// Tabela de logs de auditoria
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  action    String
+  resource  String
+  details   String? // JSON string
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  // Relacionamentos
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
+
+// Tabela de orçamentos
+model Budget {
+  id              String            @id @default(cuid())
+  establishmentId String
+  year            Int
+  month           Int
+  category        String
+  subcategory     String?
+  budgetedAmount  Float
+  spentAmount     Float             @default(0)
+  description     String?
+  isActive        Boolean           @default(true)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  expenses        Expense[]
+
+  @@unique([establishmentId, year, month, category, subcategory])
+  @@map("budgets")
+}
+
+// Tabela de despesas
+model Expense {
+  id              String            @id @default(cuid())
+  establishmentId String
+  budgetId        String?
+  category        String
+  subcategory     String?
+  amount          Float
+  description     String
+  expenseDate     DateTime
+  invoiceNumber   String?
+  supplier        String?
+  paymentMethod   String?
+  paymentDate     DateTime?
+  status          String            @default("pending")
+  approvedBy      String?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  budget          Budget?           @relation(fields: [budgetId], references: [id])
+  creator         User              @relation(fields: [createdBy], references: [id])
+
+  @@map("expenses")
+}
+
+// Tabela de contratos
+model Contract {
+  id              String            @id @default(cuid())
+  establishmentId String
+  contractNumber  String
+  supplier        String
+  description     String
+  contractType    String
+  startDate       DateTime
+  endDate         DateTime
+  totalValue      Float
+  monthlyValue    Float?
+  status          String            @default("active")
+  paymentTerms    String?
+  renewalTerms    String?
+  contactPerson   String?
+  contactPhone    String?
+  contactEmail    String?
+  notes           String?
+  createdBy       String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  creator         User              @relation(fields: [createdBy], references: [id])
+
+  @@unique([establishmentId, contractNumber])
+  @@map("contracts")
+}
+
+// Tabela de notificações epidemiológicas
+model DiseaseNotification {
+  id              String            @id @default(cuid())
+  establishmentId String
+  patientId       String?
+  diseaseCode     String
+  diseaseName     String
+  notificationDate DateTime         @default(now())
+  symptomOnsetDate DateTime?
+  diagnosisDate   DateTime?
+  notificationType String           @default("compulsory")
+  severity        String?
+  outcome         String?
+  investigationStatus String        @default("pending")
+  epidemiologicalWeek Int
+  epidemiologicalYear Int
+  patientAge      Int?
+  patientGender   String?
+  patientCity     String?
+  patientNeighborhood String?
+  riskFactors     String // JSON string
+  symptoms        String // JSON string
+  labResults      String // JSON string
+  treatmentGiven  String?
+  contactTracing  Boolean          @default(false)
+  sinanSent       Boolean          @default(false)
+  sinanDate       DateTime?
+  notes           String?
+  notifiedBy      String
+  investigatedBy  String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relacionamentos
+  establishment   Establishment     @relation(fields: [establishmentId], references: [id])
+  patient         Patient?          @relation(fields: [patientId], references: [id])
+  notifier        User              @relation("NotificationCreator", fields: [notifiedBy], references: [id])
+  investigator    User?             @relation("NotificationInvestigator", fields: [investigatedBy], references: [id])
+
+  @@map("disease_notifications")
+}
+
+// Tabela de eventos de sincronização
+model SyncEvent {
+  id              String   @id @default(cuid())
+  tableName       String
+  operation       String   // "CREATE" | "UPDATE" | "DELETE"
+  recordId        String
+  data            String   // JSON string
+  timestamp       DateTime @default(now())
+  synced          Boolean  @default(false)
+  syncedAt        DateTime?
+  retryCount      Int      @default(0)
+  lastRetryAt     DateTime?
+  lastError       String?
+  establishmentId String
+  
+  @@map("sync_events")
+}
+
+// Tabela de cache offline
+model OfflineCache {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  data          String   // JSON string
+  timestamp     DateTime @default(now())
+  expiresAt     DateTime
+  tags          String?  // JSON string
+  priority      String   @default("medium")
+  accessCount   Int      @default(0)
+  lastAccessed  DateTime @default(now())
+  
+  @@map("offline_cache")
+}
+
+// Tabela de operações offline
+model OfflineOperation {
+  id          String   @id @default(cuid())
+  type        String   // "READ" | "WRITE"
+  resource    String
+  operation   String
+  data        String?  // JSON string
+  timestamp   DateTime @default(now())
+  retryCount  Int      @default(0)
+  maxRetries  Int      @default(3)
+  status      String   @default("pending") // "pending" | "completed" | "failed"
+  lastError   String?
+  
+  @@map("offline_operations")
+}
+
+// ============================================================================
+// MEDICAL RECORDS MODELS
+// ============================================================================
+
+model MedicalEvolution {
+  id                String   @id @default(cuid())
+  patientId         String
+  professionalId    String
+  professionalName  String
+  establishmentId   String
+
+  // SOAP Structure stored as JSON
+  soapSubjective    Json
+  soapObjective     Json
+  soapAssessment    Json
+  soapPlan          Json
+
+  // Metadata
+  isDraft           Boolean  @default(true)
+  finalizedAt       DateTime?
+  attendanceId      String?  // Link to attendance if applicable
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relations
+  patient           Patient  @relation(fields: [patientId], references: [id])
+  professional      User     @relation(fields: [professionalId], references: [id])
+  establishment     Establishment @relation(fields: [establishmentId], references: [id])
+
+  @@map("medical_evolutions")
+}
+
+model Document {
+  id              String   @id @default(cuid())
+  patientId       String
+  establishmentId String
+  uploadedById    String
+
+  title           String
+  description     String?
+  fileName        String
+  filePath        String   // Path to stored file
+  fileSize        Int
+  mimeType        String
+  category        String   // "prescription" | "exam_result" | "certificate" | "other"
+
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relations
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  uploadedBy      User     @relation(fields: [uploadedById], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+
+  @@map("documents")
+}
+
+// ============================================================================
+// HR / GESTÃO DE PESSOAS MODELS
+// ============================================================================
+
+// Funcionário (separado de User do sistema)
+model Employee {
+  id                  String   @id @default(cuid())
+  registrationNumber  String   @unique  // Matrícula
+  
+  // Dados Pessoais
+  name                String
+  cpf                 String   @unique
+  rg                  String?
+  birthDate           DateTime
+  gender              String   // "male" | "female" | "other"
+  maritalStatus       String   // "single" | "married" | "divorced" | "widowed"
+  nationality         String   @default("Brasileira")
+  
+  // Endereço
+  street              String
+  number              String
+  complement          String?
+  neighborhood        String
+  city                String
+  state               String
+  zipCode             String
+  
+  // Contato
+  phone               String
+  email               String
+  emergencyContactName  String?
+  emergencyContactPhone String?
+  
+  // Profissional
+  position            String   // Cargo
+  department          String   // Setor
+  establishmentId     String
+  admissionDate       DateTime
+  terminationDate     DateTime?
+  terminationReason   String?
+  
+  // Contrato
+  contractType        String   // "CLT" | "PJ" | "TEMP" | "INTERN" | "STATUTORY"
+  baseSalary          Float
+  workHours           Int      // Horas semanais
+  scaleType           String   // "12x36" | "24x48" | "5x2" | "6x1" | "ADM"
+  
+  // Dados Bancários
+  bankName            String?
+  bankAgency          String?
+  bankAccount         String?
+  pixKey              String?
+  
+  // Documentos (URLs JSON)
+  documents           String?  // JSON array de URLs
+  
+  // Vínculo com usuário do sistema (opcional)
+  userId              String?  @unique
+  
+  isActive            Boolean  @default(true)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  
+  // Relacionamentos
+  establishment       Establishment @relation(fields: [establishmentId], references: [id])
+  timeRecords         TimeRecord[]
+  vacations           Vacation[]
+  leaves              Leave[]
+  scheduleAssignments ScheduleAssignment[]
+  payrolls            Payroll[]
+  
+  @@map("employees")
+}
+
+// Registro de Ponto
+model TimeRecord {
+  id              String   @id @default(cuid())
+  employeeId      String
+  date            DateTime @db.Date
+  
+  // Horários
+  clockIn1        DateTime?  // Entrada manhã
+  clockOut1       DateTime?  // Saída almoço
+  clockIn2        DateTime?  // Retorno almoço
+  clockOut2       DateTime?  // Saída
+  
+  // Extras
+  overtimeMinutes Int      @default(0)
+  lateMinutes     Int      @default(0)
+  absentMinutes   Int      @default(0)
+  
+  // Status
+  status          String   @default("pending") // "pending" | "approved" | "rejected" | "justified"
+  justification   String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  
+  @@unique([employeeId, date])
+  @@map("time_records")
+}
+
+// Férias
+model Vacation {
+  id              String   @id @default(cuid())
+  employeeId      String
+  
+  // Período Aquisitivo
+  referenceYear   Int
+  startDate       DateTime
+  endDate         DateTime
+  daysTotal       Int
+  daysUsed        Int      @default(0)
+  
+  // Abono
+  sellDays        Int      @default(0)  // Dias vendidos
+  
+  // Status
+  status          String   @default("pending") // "pending" | "approved" | "rejected" | "in_progress" | "completed"
+  requestedAt     DateTime @default(now())
+  approvedBy      String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  
+  @@map("vacations")
+}
+
+// Afastamentos/Licenças
+model Leave {
+  id              String   @id @default(cuid())
+  employeeId      String
+  
+  // Tipo de afastamento
+  leaveType       String   // "medical" | "maternity" | "paternity" | "bereavement" | "marriage" | "study" | "unpaid" | "other"
+  
+  // Período
+  startDate       DateTime
+  endDate         DateTime?
+  expectedReturn  DateTime?
+  actualReturn    DateTime?
+  
+  // Documentação
+  documentNumber  String?  // CID, número do atestado, etc
+  documentUrl     String?
+  
+  // Status
+  status          String   @default("active") // "active" | "completed" | "cancelled"
+  
+  reason          String
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  
+  @@map("leaves")
+}
+
+// Escala de Trabalho
+model WorkSchedule {
+  id              String   @id @default(cuid())
+  name            String
+  establishmentId String
+  department      String?
+  
+  // Tipo de escala
+  scaleType       String   // "12x36" | "24x48" | "5x2" | "6x1" | "custom"
+  
+  // Período
+  startDate       DateTime
+  endDate         DateTime?
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  assignments     ScheduleAssignment[]
+  
+  @@map("work_schedules")
+}
+
+// Atribuição de Escala
+model ScheduleAssignment {
+  id              String   @id @default(cuid())
+  scheduleId      String
+  employeeId      String
+  
+  // Turno específico
+  date            DateTime @db.Date
+  shiftStart      String   // "07:00"
+  shiftEnd        String   // "19:00"
+  shiftType       String   // "day" | "night" | "off" | "vacation" | "leave"
+  
+  // Status
+  status          String   @default("scheduled") // "scheduled" | "confirmed" | "swapped" | "cancelled"
+  swappedWith     String?  // ID do funcionário que trocou
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  schedule        WorkSchedule @relation(fields: [scheduleId], references: [id])
+  employee        Employee     @relation(fields: [employeeId], references: [id])
+  
+  @@unique([scheduleId, employeeId, date])
+  @@map("schedule_assignments")
+}
+
+// Folha de Pagamento
+model Payroll {
+  id              String   @id @default(cuid())
+  employeeId      String
+  
+  // Período
+  referenceMonth  Int
+  referenceYear   Int
+  
+  // Valores
+  baseSalary      Float
+  overtimePay     Float    @default(0)
+  bonuses         Float    @default(0)
+  deductions      Float    @default(0)
+  inssDeduction   Float    @default(0)
+  irDeduction     Float    @default(0)
+  otherDeductions Float    @default(0)
+  netSalary       Float
+  
+  // Detalhes (JSON)
+  details         String?  // JSON com breakdown detalhado
+  
+  // Status
+  status          String   @default("draft") // "draft" | "calculated" | "approved" | "paid"
+  calculatedAt    DateTime?
+  approvedBy      String?
+  approvedAt      DateTime?
+  paidAt          DateTime?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  employee        Employee @relation(fields: [employeeId], references: [id])
+  
+  @@unique([employeeId, referenceMonth, referenceYear])
+  @@map("payrolls")
+}
+
+// ============================================================================
+// HOME VISIT / VISITA DOMICILIAR (UBS)
+// ============================================================================
+
+model HomeVisit {
+  id              String   @id @default(cuid())
+  patientId       String
+  professionalId  String   // ACS ou outro profissional
+  establishmentId String
+  
+  // Agendamento
+  scheduledDate   DateTime
+  scheduledTime   String   // "HH:MM"
+  visitType       String   // "routine" | "followup" | "active_search" | "bedridden" | "post_discharge" | "newborn" | "prenatal"
+  reason          String
+  priority        String   @default("normal") // "low" | "normal" | "high" | "urgent"
+  
+  // Realização
+  realizedAt      DateTime?
+  duration        Int?     // Minutos
+  status          String   @default("scheduled") // "scheduled" | "in_progress" | "completed" | "cancelled" | "not_found" | "rescheduled"
+  cancellationReason String?
+  
+  // Condições do Domicílio
+  hasRunningWater Boolean?
+  hasSewage       Boolean?
+  hasGarbageCollection Boolean?
+  hasElectricity  Boolean?
+  buildingType    String?  // "masonry" | "wood" | "mixed" | "improvised" | "other"
+  roomsCount      Int?
+  residentsCount  Int?
+  
+  // Registro da Visita
+  situationFound  String?  // Descrição geral
+  patientCondition String? // Estado do paciente
+  actionsPerformed String? // JSON array de ações
+  orientationsGiven String? // Orientações dadas
+  referrals       String?  // Encaminhamentos
+  
+  // Follow-up
+  nextVisitDate   DateTime?
+  observations    String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("home_visits")
+}
+
+// ============================================================================
+// SURGERY / CENTRO CIRÚRGICO
+// ============================================================================
+
+model Surgery {
+  id              String   @id @default(cuid())
+  patientId       String
+  establishmentId String
+  admissionId     String?  // Se paciente internado
+  
+  // Procedimento
+  procedureCode   String   // Código TUSS
+  procedureName   String
+  procedureType   String   // "elective" | "urgency" | "emergency"
+  laterality      String?  // "left" | "right" | "bilateral" | "na"
+  
+  // Agendamento
+  scheduledDate   DateTime
+  scheduledTime   String
+  estimatedDuration Int    // Minutos
+  roomNumber      String
+  
+  // Equipe
+  surgeonId       String   // Cirurgião principal
+  assistantIds    String?  // JSON array de IDs dos auxiliares
+  anesthetistId   String?  // Anestesista
+  instrumenterId  String?  // Instrumentador
+  nursingTeam     String?  // JSON array de IDs da equipe de enfermagem
+  
+  // Anestesia
+  anesthesiaType  String?  // "general" | "regional" | "local" | "sedation" | "combined"
+  asaScore        String?  // ASA I a VI
+  
+  // Pré-operatório
+  preOpNotes      String?
+  preOpExams      String?  // JSON array de exames
+  consentSigned   Boolean  @default(false)
+  fastingConfirmed Boolean @default(false)
+  
+  // Execução
+  status          String   @default("scheduled") // "scheduled" | "pre_op" | "in_progress" | "recovery" | "completed" | "cancelled"
+  actualStartTime DateTime?
+  actualEndTime   DateTime?
+  
+  // Pós-operatório
+  complications   String?
+  bloodLoss       Int?     // ml
+  surgicalNotes   String?
+  recoveryNotes   String?
+  
+  // Materiais
+  materialsUsed   String?  // JSON
+  specialEquipment String? // JSON
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("surgeries")
+}
+
+// ============================================================================
+// IMAGING EXAMS / EXAMES DE IMAGEM
+// ============================================================================
+
+model ImagingExam {
+  id              String   @id @default(cuid())
+  patientId       String
+  requestedById   String   // Médico solicitante
+  establishmentId String
+  attendanceId    String?
+  
+  // Exame
+  examType        String   // "RX" | "USG" | "TC" | "RM" | "MAM" | "DENS" | "ANGIO" | "PET"
+  examCode        String   // Código TUSS
+  examName        String
+  bodyRegions     String   // JSON array de regiões anatômicas
+  laterality      String?  // "bilateral" | "left" | "right" | "na"
+  
+  // Indicação
+  clinicalIndication String
+  diagnosticHypothesis String?
+  urgency         String   @default("routine") // "routine" | "urgent" | "emergency"
+  
+  // Alertas
+  contrastRequired Boolean @default(false)
+  contrastType    String?
+  contrastAllergy Boolean  @default(false)
+  claustrophobic  Boolean  @default(false)
+  pregnant        Boolean  @default(false)
+  pacemaker       Boolean  @default(false)
+  metalImplants   String?  // JSON descrevendo implantes
+  
+  // Agendamento
+  status          String   @default("requested") // "requested" | "scheduled" | "in_progress" | "completed" | "reported" | "cancelled"
+  scheduledFor    DateTime?
+  room            String?
+  
+  // Realização
+  performedAt     DateTime?
+  performedById   String?  // Técnico/Radiologista executor
+  technicalNotes  String?
+  
+  // Laudo
+  findings        String?  // Achados
+  conclusion      String?  // Conclusão
+  impression      String?  // Impressão diagnóstica
+  recommendations String?  // Recomendações
+  reportedById    String?  // Radiologista laudador
+  reportedAt      DateTime?
+  
+  // Imagens
+  imagesCount     Int      @default(0)
+  imagesUrls      String?  // JSON array de URLs
+  dicomStudyUid   String?  // UID do estudo DICOM
+  
+  observations    String?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("imaging_exams")
+}
+
+// ============================================================================
+// VACCINATION / VACINAÇÃO (UBS)
+// ============================================================================
+
+model Vaccination {
+  id              String   @id @default(cuid())
+  patientId       String
+  professionalId  String
+  establishmentId String
+  
+  // Vacina
+  vaccineName     String
+  vaccineCode     String   // Código do SI-PNI
+  manufacturer    String?
+  batch           String
+  expirationDate  DateTime
+  dose            String   // "1ª dose" | "2ª dose" | "3ª dose" | "reforço" | "única"
+  doseNumber      Int      @default(1)
+  
+  // Aplicação
+  applicationDate DateTime @default(now())
+  applicationSite String   // "deltóide D" | "deltóide E" | "vasto lateral D" | "vasto lateral E" | "glúteo D" | "glúteo E"
+  route           String   // "IM" | "SC" | "ID" | "VO"
+  
+  // Campanha
+  campaignId      String?
+  campaignName    String?
+  
+  // Reações adversas
+  hasAdverseReaction Boolean @default(false)
+  adverseReactionDesc String?
+  adverseReactionDate DateTime?
+  
+  // Status
+  status          String   @default("applied") // "scheduled" | "applied" | "cancelled" | "postponed"
+  postponeReason  String?
+  nextDoseDate    DateTime?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("vaccinations")
+}
+
+// ============================================================================
+// HEALTH PROGRAMS / PROGRAMAS DE SAÚDE (UBS)
+// ============================================================================
+
+model HealthProgram {
+  id              String   @id @default(cuid())
+  name            String   // "hiperdia" | "prenatal" | "childcare" | "elderly" | "mental_health" | "tobacco" | "diabetes"
+  description     String?
+  establishmentId String
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  enrollments     ProgramEnrollment[]
+  
+  @@unique([name, establishmentId])
+  @@map("health_programs")
+}
+
+model ProgramEnrollment {
+  id              String   @id @default(cuid())
+  programId       String
+  patientId       String
+  professionalId  String
+  establishmentId String
+  
+  // Dados do programa
+  enrollmentDate  DateTime @default(now())
+  status          String   @default("active") // "active" | "completed" | "abandoned" | "transferred"
+  exitDate        DateTime?
+  exitReason      String?
+  
+  // Dados específicos (JSON)
+  programData     String?  // JSON com dados específicos do programa
+  
+  // Acompanhamento
+  lastVisitDate   DateTime?
+  nextVisitDate   DateTime?
+  riskLevel       String?  // "low" | "medium" | "high"
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  program         HealthProgram @relation(fields: [programId], references: [id])
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  
+  @@unique([programId, patientId])
+  @@map("program_enrollments")
+}
+
+// ============================================================================
+// DENTAL / ODONTOLOGIA (UBS)
+// ============================================================================
+
+model DentalAttendance {
+  id              String   @id @default(cuid())
+  patientId       String
+  professionalId  String
+  establishmentId String
+  attendanceId    String?
+  
+  // Tipo de atendimento
+  attendanceType  String   // "first_visit" | "return" | "urgency" | "prevention" | "restoration" | "extraction" | "endodontics" | "periodontics" | "prosthetics"
+  
+  // Anamnese odontológica
+  chiefComplaint  String
+  dentalHistory   String?
+  lastDentalVisit DateTime?
+  brushingFrequency Int?   // Vezes por dia
+  usesFloss       Boolean  @default(false)
+  
+  // Exame clínico
+  odontogram      String?  // JSON com mapa dos dentes
+  periodontalExam String?  // JSON
+  softTissueExam  String?
+  
+  // Procedimentos realizados (JSON array)
+  procedures      String?
+  
+  // Diagnóstico
+  diagnosis       String?
+  cid10Codes      String?  // JSON array
+  
+  // Plano de tratamento
+  treatmentPlan   String?
+  urgency         String   @default("routine") // "routine" | "priority" | "urgency"
+  
+  // Status
+  status          String   @default("in_progress") // "scheduled" | "in_progress" | "completed" | "cancelled"
+  
+  // Agendamento retorno
+  nextVisitDate   DateTime?
+  nextVisitNotes  String?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("dental_attendances")
+}
+
+// ============================================================================
+// LABORATORY / LABORATÓRIO
+// ============================================================================
+
+model LabExam {
+  id              String   @id @default(cuid())
+  patientId       String
+  requestedById   String
+  establishmentId String
+  attendanceId    String?
+  
+  // Exame
+  examCode        String   // Código TUSS ou SIGTAP
+  examName        String
+  examCategory    String   // "hematology" | "biochemistry" | "urinalysis" | "microbiology" | "serology" | "hormones" | "coagulation"
+  material        String   // "blood" | "urine" | "feces" | "sputum" | "swab" | "csf" | "other"
+  
+  // Indicação
+  clinicalIndication String
+  fastingRequired Boolean  @default(false)
+  fastingHours    Int?
+  
+  // Coleta
+  status          String   @default("requested") // "requested" | "scheduled" | "collected" | "processing" | "completed" | "cancelled"
+  scheduledFor    DateTime?
+  collectedAt     DateTime?
+  collectedBy     String?
+  sampleId        String?  // ID da amostra
+  
+  // Resultado
+  results         String?  // JSON com resultados
+  referenceValues String?  // JSON com valores de referência
+  interpretation  String?
+  isNormal        Boolean?
+  isCritical      Boolean  @default(false)
+  criticalAlert   String?
+  
+  // Validação
+  analyzedBy      String?
+  analyzedAt      DateTime?
+  validatedBy     String?
+  validatedAt     DateTime?
+  
+  observations    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("lab_exams")
+}
+
+// ============================================================================
+// PHARMACY STOCK / ESTOQUE FARMÁCIA
+// ============================================================================
+
+model PharmacyProduct {
+  id              String   @id @default(cuid())
+  establishmentId String
+  
+  // Identificação
+  code            String   // Código interno ou ANVISA
+  barcode         String?
+  name            String
+  genericName     String?
+  manufacturer    String?
+  
+  // Classificação
+  category        String   // "medication" | "supply" | "equipment" | "controlled"
+  subcategory     String?
+  therapeuticClass String?
+  
+  // Apresentação
+  presentation    String   // "comprimido" | "cápsula" | "ampola" | "frasco" | etc
+  concentration   String?
+  unit            String   // "un" | "cx" | "fr" | "amp" | "cp"
+  
+  // Controle
+  isControlled    Boolean  @default(false)
+  controlType     String?  // "A1" | "A2" | "B1" | "B2" | "C1" | etc
+  requiresPrescription Boolean @default(false)
+  
+  // Estoque
+  minStock        Int      @default(0)
+  maxStock        Int?
+  currentStock    Int      @default(0)
+  reservedStock   Int      @default(0)
+  
+  // Localização
+  storageLocation String?
+  storageConditions String? // "ambient" | "refrigerated" | "frozen"
+  
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  stockMovements  StockMovement[]
+  batches         ProductBatch[]
+  
+  @@unique([code, establishmentId])
+  @@map("pharmacy_products")
+}
+
+model ProductBatch {
+  id              String   @id @default(cuid())
+  productId       String
+  
+  batchNumber     String
+  expirationDate  DateTime
+  manufacturingDate DateTime?
+  quantity        Int
+  currentQuantity Int
+  unitCost        Float?
+  
+  // Rastreabilidade
+  supplier        String?
+  invoiceNumber   String?
+  receivedAt      DateTime @default(now())
+  receivedBy      String?
+  
+  status          String   @default("active") // "active" | "expired" | "recalled" | "depleted"
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  product         PharmacyProduct @relation(fields: [productId], references: [id])
+  
+  @@unique([productId, batchNumber])
+  @@map("product_batches")
+}
+
+model StockMovement {
+  id              String   @id @default(cuid())
+  productId       String
+  establishmentId String
+  
+  // Movimento
+  movementType    String   // "entry" | "exit" | "adjustment" | "transfer" | "loss" | "return"
+  quantity        Int
+  previousStock   Int
+  newStock        Int
+  
+  // Detalhes
+  batchNumber     String?
+  unitCost        Float?
+  totalCost       Float?
+  
+  // Referências
+  referenceType   String?  // "prescription" | "purchase" | "adjustment" | "dispensation"
+  referenceId     String?
+  
+  // Destino/Origem
+  destinationUnit String?
+  sourceUnit      String?
+  patientId       String?
+  
+  reason          String?
+  performedBy     String
+  performedAt     DateTime @default(now())
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  
+  // Relacionamentos
+  product         PharmacyProduct @relation(fields: [productId], references: [id])
+  
+  @@map("stock_movements")
+}
+
+// ============================================================================
+// UPA SPECIFIC / ESPECÍFICOS UPA
+// ============================================================================
+
+model MedicationRoom {
+  id              String   @id @default(cuid())
+  patientId       String
+  professionalId  String
+  establishmentId String
+  attendanceId    String?
+  prescriptionId  String?
+  
+  // Medicamento
+  medicationName  String
+  dosage          String
+  route           String   // "IV" | "IM" | "SC" | "VO" | "INH" | "TOP"
+  
+  // Administração
+  scheduledTime   DateTime
+  administeredAt  DateTime?
+  administeredBy  String?
+  
+  // Status
+  status          String   @default("scheduled") // "scheduled" | "in_progress" | "completed" | "cancelled" | "refused"
+  
+  // Observação
+  vitalSignsBefore String?  // JSON
+  vitalSignsAfter String?   // JSON
+  reactions       String?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("medication_room")
+}
+
+model MinorSurgery {
+  id              String   @id @default(cuid())
+  patientId       String
+  professionalId  String
+  establishmentId String
+  attendanceId    String?
+  
+  // Procedimento
+  procedureCode   String
+  procedureName   String
+  procedureType   String   // "suture" | "drainage" | "biopsy" | "excision" | "debridement" | "dressing" | "foreign_body_removal"
+  
+  // Localização
+  bodyRegion      String
+  laterality      String?
+  
+  // Anestesia
+  anesthesiaType  String?  // "local" | "topic" | "none"
+  anesthetic      String?
+  
+  // Execução
+  scheduledFor    DateTime?
+  startTime       DateTime?
+  endTime         DateTime?
+  duration        Int?     // Minutos
+  
+  // Status
+  status          String   @default("scheduled") // "scheduled" | "in_progress" | "completed" | "cancelled"
+  
+  // Materiais
+  materialsUsed   String?  // JSON
+  sutureType      String?
+  sutureCount     Int?
+  
+  // Pós-procedimento
+  postProcedureNotes String?
+  complications   String?
+  returnDate      DateTime?
+  returnInstructions String?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("minor_surgeries")
+}
+
+// ============================================================================
+// HOSPITAL SPECIFIC / ESPECÍFICOS HOSPITAL
+// ============================================================================
+
+model EmergencyAttendance {
+  id              String   @id @default(cuid())
+  patientId       String
+  professionalId  String
+  establishmentId String
+  triageId        String?
+  
+  // Chegada
+  arrivalTime     DateTime @default(now())
+  arrivalMode     String   // "walking" | "ambulance" | "samu" | "transfer" | "other"
+  origin          String?
+  
+  // Classificação de risco
+  manchesterColor String   // "red" | "orange" | "yellow" | "green" | "blue"
+  chiefComplaint  String
+  
+  // Atendimento
+  firstContactTime DateTime?
+  medicalStartTime DateTime?
+  
+  // Evolução
+  disposition     String?  // "discharge" | "observation" | "admission" | "transfer" | "surgery" | "death"
+  dispositionTime DateTime?
+  
+  // Status
+  status          String   @default("waiting") // "waiting" | "in_triage" | "waiting_medical" | "in_attendance" | "observation" | "completed"
+  
+  // Observação (se aplicável)
+  observationBedId String?
+  observationStartTime DateTime?
+  observationEndTime DateTime?
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("emergency_attendances")
+}
+
+model ICUAdmission {
+  id              String   @id @default(cuid())
+  patientId       String
+  establishmentId String
+  admissionId     String?  // Vínculo com internação geral
+  bedId           String
+  
+  // Admissão
+  admissionDate   DateTime @default(now())
+  admissionFrom   String   // "emergency" | "surgery" | "ward" | "external"
+  admissionReason String
+  admissionDiagnosis String
+  
+  // Classificação
+  apacheScore     Int?
+  sofaScore       Int?
+  sapsScore       Int?
+  
+  // Equipe
+  attendingPhysicianId String
+  
+  // Monitorização
+  ventilationMode String?  // "spontaneous" | "invasive" | "niv" | "cpap"
+  sedationLevel   String?
+  vasopressors    String?  // JSON
+  
+  // Alta
+  dischargeDate   DateTime?
+  dischargeTo     String?  // "ward" | "home" | "transfer" | "death"
+  dischargeReason String?
+  
+  // Status
+  status          String   @default("active") // "active" | "discharged" | "transferred" | "death"
+  
+  lengthOfStay    Int?     // Dias
+  
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("icu_admissions")
+}
+
+model Discharge {
+  id              String   @id @default(cuid())
+  patientId       String
+  establishmentId String
+  admissionId     String
+  
+  // Data da alta
+  dischargeDate   DateTime @default(now())
+  dischargeType   String   // "medical" | "request" | "transfer" | "death" | "escape"
+  
+  // Responsável
+  physicianId     String
+  physicianName   String
+  crm             String
+  
+  // Condição na alta
+  patientCondition String  // "improved" | "cured" | "stable" | "unchanged" | "worsened" | "death"
+  
+  // Diagnósticos
+  mainDiagnosis   String
+  mainCid10       String
+  secondaryDiagnosis String? // JSON array
+  secondaryCid10  String?    // JSON array
+  
+  // Procedimentos realizados
+  procedures      String?    // JSON array
+  
+  // Orientações de alta
+  instructions    String?
+  restrictions    String?
+  dietRecommendations String?
+  activityRecommendations String?
+  
+  // Medicamentos na alta
+  prescriptions   String?    // JSON array
+  
+  // Retorno
+  returnDate      DateTime?
+  returnInstructions String?
+  
+  // Encaminhamentos
+  referrals       String?    // JSON array
+  
+  // Sumário de alta
+  dischargeSummary String?
+  
+  // Status
+  status          String   @default("pending") // "pending" | "completed" | "cancelled"
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // Relacionamentos
+  patient         Patient       @relation(fields: [patientId], references: [id])
+  establishment   Establishment @relation(fields: [establishmentId], references: [id])
+  
+  @@map("discharges")
+}

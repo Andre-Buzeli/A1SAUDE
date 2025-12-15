@@ -1,0 +1,71 @@
+// Sistema A1 Saúde - Prisma Schema para SQLite (Desenvolvimento)
+// Banco de dados SQLite para desenvolvimento
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// Modelos existentes (simplificados para teste)
+model User {
+  id    String @id @default(cuid())
+  email String @unique
+  name  String?
+}
+
+// Novas tabelas de sincronização
+model SyncEvent {
+  id          String   @id @default(cuid())
+  type        String
+  entity      String
+  entityId    String
+  data        String   // JSON como string para SQLite
+  timestamp   DateTime @default(now())
+  status      String   @default("pending")
+  retryCount  Int      @default(0)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@index([type, status])
+  @@index([timestamp])
+  @@index([status, retryCount])
+}
+
+model OfflineCache {
+  id           String    @id @default(cuid())
+  key          String    @unique
+  data         String    // JSON como string para SQLite
+  timestamp    DateTime  @default(now())
+  ttl          Int       @default(3600)
+  expiresAt    DateTime
+  accessCount  Int       @default(0)
+  lastAccessed DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now())
+
+  @@index([key])
+  @@index([expiresAt])
+}
+
+model OfflineOperation {
+  id          String   @id @default(cuid())
+  method      String
+  url         String
+  headers     String?  // JSON como string para SQLite
+  body        String?  // JSON como string para SQLite
+  timestamp   DateTime @default(now())
+  status      String   @default("pending")
+  retryCount  Int      @default(0)
+  lastError   String?
+  response    String?  // JSON como string para SQLite
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now())
+
+  @@index([status, retryCount])
+  @@index([timestamp])
+}
