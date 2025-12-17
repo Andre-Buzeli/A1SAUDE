@@ -367,3 +367,5 @@ const EstablishmentsPage: React.FC = () => {
 
 export default EstablishmentsPage;
 
+
+

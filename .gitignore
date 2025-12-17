@@ -1,4 +1,5 @@
 .DS_Store
+conversas whatsapp/
 Thumbs.db
 *.log
 *.tmp
@@ -21,3 +22,7 @@ backend/dist/
 frontend/dist/
 backend/uploads/
 frontend/.vite/
+*.md
+.cursor/
+temp_scripts/
+Temp_script/
