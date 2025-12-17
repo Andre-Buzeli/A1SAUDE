@@ -1,1 +1,0 @@
-Porque quando eu coloco no modo teste de UPA, o BS faltou a hospital, não é constortório e não está atualizando nada, está ficando a mesma página de sempre.

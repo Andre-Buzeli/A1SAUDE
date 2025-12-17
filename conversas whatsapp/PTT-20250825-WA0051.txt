@@ -1,1 +1,0 @@
-A questão é que eu queria que ele estivesse em um acesso do gestor geral, só que somente filtrado a unidade de saúde dele. Vai ter o local e vai ter o geral da unidade. Não pode o geral da unidade ter acesso a esse mesmo acesso que eu tenho aqui que consegue me dar os dados de vários serviços.

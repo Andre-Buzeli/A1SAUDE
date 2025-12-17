@@ -1,1 +1,0 @@
-É basicamente um acesso de gestor geral só que, filtrado de acessos, ele vai ter as mesmas atribuições do gestor geral, só que de somente de uma respectiva unidade.

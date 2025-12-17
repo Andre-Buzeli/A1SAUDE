@@ -1,1 +1,0 @@
-O que é que eu acho que vai ser mais fácil é criar um novo acesso igual, igual ao do gestor geral, só que somente com os dados da respectiva unidade dele.
